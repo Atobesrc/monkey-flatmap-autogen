@@ -1,0 +1,14 @@
+{
+ "format": "cut_recipe/1",
+ "recipe": {
+  "slit_width": 2,
+  "temporal_src": "nearest_Amy_ant",
+  "temporal_dst": "TG_ant",
+  "temporal_corridor": "lateral",
+  "temporal_extend": "none",
+  "calcarine_extend": "none"
+ },
+ "code": "w2_Aa_TGa_lat_e0",
+ "note": "ONE anatomical cut route for every hemisphere of every subject. The five landmark fields (temporal_src, temporal_dst, temporal_corridor, temporal_extend, calcarine_extend) are the shared anatomical standard; apply with `mfa flatten --cut-recipe <this file>` (this file is the default).",
+ "slit_width_policy": "recipe.slit_width is only the default/fallback (the one shared width the joint search used). The slit width is a technical parameter, not part of the route: the standard is the NARROWEST width that passes every quality gate on each hemisphere (1 boundary loop, 0 isolated vertices, 1 component, 0 flipped triangles, canonical orientation, hot_pack <= 3), chosen automatically with `--slit-width auto` (tries 1, 2, 3 in order) or fixed per hemisphere with `--slit-width lh=<a>,rh=<b>`."
+}
