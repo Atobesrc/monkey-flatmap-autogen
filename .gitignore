@@ -1,0 +1,34 @@
+# development scratch (verification scripts and outputs)
+_dev/
+
+# python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.eggs/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.venv/
+venv/
+
+# outputs
+mfa_out/
+*.log
+
+# editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# documentation is not public yet (kept locally)
+docs/
+
+# not public yet (kept locally)
+CITATION.cff
+CONTRIBUTING.md
+LICENSE
+CHANGELOG.md
