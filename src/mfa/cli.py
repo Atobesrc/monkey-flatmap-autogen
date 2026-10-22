@@ -215,7 +215,8 @@ def cmd_overlay_parcels(a: argparse.Namespace) -> None:
     subjects_dir = _require_subjects_dir(a)
     cx = a.pycortex_subject or a.subject.replace("sub-", "")
     draw_parcels(cx, a.subject, subjects_dir, _parc(a), layer=a.layer, skip=tuple(a.skip), min_faces=a.min_faces,
-                 font_size=a.font_size, min_label_depth=a.min_label_depth, min_label_share=a.min_label_share)
+                 font_size=a.font_size, min_label_depth=a.min_label_depth, min_label_share=a.min_label_share,
+                 smooth=a.smooth)
     if a.render:
         title = a.render_title if a.render_title is not None else f"{cx}: {a.annot} parcels (layer {a.layer})"
         render_layer(cx, a.subject, subjects_dir, a.layer, a.render, labelsize=a.render_labelsize, title=title or None)
@@ -404,6 +405,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--skip", nargs="*", default=["unknown", "Unknown", "???"], help="label names to skip")
     p.add_argument("--min-faces", type=int, default=40, help="drop parcel islands smaller than this (faces)")
     p.add_argument("--font-size", default="11pt")
+    p.add_argument("--smooth", type=int, default=0, help="Chaikin smoothing iterations for the outlines (2 = smooth curves)")
     p.add_argument("--min-label-depth", type=float, default=14.0,
                    help="skip the label of a piece thinner than this (px from border to its deepest point)")
     p.add_argument("--min-label-share", type=float, default=0.10,

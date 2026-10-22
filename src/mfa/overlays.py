@@ -133,9 +133,22 @@ def label_pose(q, vs, dist, anchor, name, font_px, core_frac=0.6, max_anchor_dis
     return float(x), float(y), angle, float(dist[i])
 
 
+def _chaikin(pts: np.ndarray, iterations: int) -> np.ndarray:
+    """Chaikin corner-cutting on a CLOSED polygon: each pass replaces every edge by its
+    1/4 and 3/4 points, rounding mesh-edge zigzag into a smooth outline."""
+    for _ in range(iterations):
+        nxt = np.roll(pts, -1, axis=0)
+        out = np.empty((2 * len(pts), 2), float)
+        out[0::2] = 0.75 * pts + 0.25 * nxt
+        out[1::2] = 0.25 * pts + 0.75 * nxt
+        pts = out
+    return pts
+
+
 def draw_parcels(cx_subject: str, fs_subject: str, subjects_dir: str, parc: Parcellation = DEFAULT_PARCELLATION,
                  layer: str = "rois", skip: Sequence[str] = DEFAULT_SKIP, min_faces: int = 40,
-                 font_size: str = "11pt", min_label_depth: float = 14.0, min_label_share: float = 0.10) -> dict:
+                 font_size: str = "11pt", min_label_depth: float = 14.0, min_label_share: float = 0.10,
+                 smooth: int = 0) -> dict:
     """Write parcel outlines and labels of ``label/<hemi>.<annot>.annot`` into ``overlays.svg``.
 
     Parameters
@@ -152,6 +165,8 @@ def draw_parcels(cx_subject: str, fs_subject: str, subjects_dir: str, parc: Parc
     min_label_depth, min_label_share
         A piece thinner than ``min_label_depth`` px or holding less than
         ``min_label_share`` of the parcel gets an outline but no label.
+    smooth : Chaikin corner-cutting iterations on every outline (0 = raw mesh edges;
+        2 gives publication-style smooth curves; the underlying vertex sets are untouched).
 
     Returns
     -------
@@ -240,7 +255,9 @@ def draw_parcels(cx_subject: str, fs_subject: str, subjects_dir: str, parc: Parc
                 groups[i] = [i]
         made = []
         for k, (main, members) in enumerate(groups.items()):
-            d = "".join("M" + " L".join("%.2f %.2f" % tuple(q[v]) for v in loop) + " Z "
+            d = "".join("M" + " L".join("%.2f %.2f" % tuple(pt) for pt in
+                                        (_chaikin(q[np.asarray(loop)], smooth) if smooth
+                                         else q[np.asarray(loop)])) + " Z "
                         for i in members for loop in pieces[i]["loops"])
             p = etree.SubElement(g, "{%s}path" % SVGNS)
             p.set("d", d.strip())
