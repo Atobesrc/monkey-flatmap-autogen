@@ -20,6 +20,7 @@ A cut also has to leave the areas it passes intact. An area split in two appears
 - `mfa reference`, `mfa compare`: save a subject's parcel layout as a reference, and compare layouts across hemispheres or subjects (similarity alignment, parcel centroid displacement, Dice overlap, seam-side agreement) with overlay figures and tables.
 - `mfa overlay-parcels`: draws a FreeSurfer annotation into `overlays.svg` as outlines and labels, with labels placed in the interior of each parcel, rotated along elongated parcels, and slivers folded into their main piece so that pycortex does not label them separately. Can also render the result.
 - `mfa atlas-annot`: resamples a volumetric label atlas onto the surface by a majority vote over several cortical depths and writes an `.annot` file.
+- `mfa roi-consensus` / `roi-separate` / `roi-tile` / `roi-render`: functional category ROIs from statistical maps registered onto the subject's anatomy — cross-session consensus thresholded, parcel-restricted and closed into circled publication-style patches (annot + `overlays.svg` layer + vertex mask + json provenance holding exactly the same vertices); two ROI groups made mutually exclusive by symmetric dominance arbitration while every ROI stays one connected patch, or a strict winner-take-all tiling; rendered as colored outlines with a legend (see `mfa roi-consensus --help` and friends).
 - `mfa qc`: metrics and figures for existing patches. `mfa import-subject`: FreeSurfer subject to pycortex subject.
 - Deterministic: the same cut patch gives the same flat coordinates on every run, bit-identical when the BLAS thread count is fixed.
 
@@ -35,7 +36,7 @@ pip install "git+https://github.com/gallantlab/pycortex.git"   # for apply / ove
 pip install -e .                                          # this package
 ```
 
-pycortex is needed only by `mfa apply`, `mfa import-subject`, `mfa overlay-parcels` and `mfa atlas-annot`; cutting, flattening, QC and comparison need only numpy, scipy, nibabel, matplotlib and libigl. pycortex renders the `overlays.svg` layers through **Inkscape**: set its path in `~/.config/pycortex/options.cfg` (`[dependency_paths] inkscape = ...`) together with the pycortex database folder (`[basic] filestore = ...`). To run the tests: `pip install -e .[test] && pytest`.
+pycortex is needed only by `mfa apply`, `mfa import-subject`, `mfa overlay-parcels`, `mfa atlas-annot` and the `mfa roi-*` commands; cutting, flattening, QC and comparison need only numpy, scipy, nibabel, matplotlib and libigl. pycortex renders the `overlays.svg` layers through **Inkscape**: set its path in `~/.config/pycortex/options.cfg` (`[dependency_paths] inkscape = ...`) together with the pycortex database folder (`[basic] filestore = ...`). To run the tests: `pip install -e .[test] && pytest`.
 
 ## Quick start
 

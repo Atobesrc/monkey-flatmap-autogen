@@ -232,6 +232,42 @@ def cmd_atlas_annot(a: argparse.Namespace) -> None:
                    hemis=tuple(a.hemis))
 
 
+def _roi_common(p: argparse.ArgumentParser) -> None:
+    p.add_argument("--subjects-dir", default=os.environ.get("SUBJECTS_DIR"),
+                   help="FreeSurfer subjects directory (default: $SUBJECTS_DIR)")
+    p.add_argument("--subject", required=True, help="FreeSurfer subject name ($SUBJECTS_DIR/<subject>)")
+    p.add_argument("--pycortex-subject", default=None, help="pycortex subject (default: --subject without 'sub-')")
+    p.add_argument("--quiet", action="store_true", help="only warnings and errors")
+
+
+def cmd_roi_consensus(a: argparse.Namespace) -> None:
+    from .rois import consensus
+
+    a.subjects_dir = _require_subjects_dir(a)
+    consensus(a)
+
+
+def cmd_roi_separate(a: argparse.Namespace) -> None:
+    from .rois import separate
+
+    a.subjects_dir = _require_subjects_dir(a)
+    separate(a)
+
+
+def cmd_roi_tile(a: argparse.Namespace) -> None:
+    from .rois import tile
+
+    a.subjects_dir = _require_subjects_dir(a)
+    tile(a)
+
+
+def cmd_roi_render(a: argparse.Namespace) -> None:
+    from .rois import render_layers
+
+    a.subjects_dir = _require_subjects_dir(a)
+    render_layers(a)
+
+
 def cmd_qc(a: argparse.Namespace) -> None:
     from .flatten import hemi_quality, passes_gates, quality_line, silhouette_norm
     from .layout import SIDE_CONF_MIN, flat_layout, load_reference_layout, reference_metrics
@@ -431,6 +467,139 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--depths", nargs="*", type=float, default=[0.2, 0.35, 0.5, 0.65, 0.8])
     p.add_argument("--hemis", nargs="+", default=["lh", "rh"], choices=["lh", "rh"])
     p.set_defaults(func=cmd_atlas_annot)
+
+    p = sp.add_parser("roi-consensus",
+                      help="functional ROIs from N registered maps: consensus, parcels, circled clusters -> "
+                           "annot + overlays.svg layer + vertex mask")
+    _roi_common(p)
+    p.add_argument("--map", action="append", required=True, metavar="XFM:VOLUME",
+                   help="pycortex transform name + volume on the canonical grid; repeat per "
+                        "session, consensus = significant in ALL of them")
+    p.add_argument("--thresh", type=float, default=4.0, help="|sig| threshold per map")
+    p.add_argument("--mion", action=argparse.BooleanOptionalAction, default=True,
+                   help="flip sign before thresholding (MION: activation = signal decrease; default on, "
+                        "--no-mion for BOLD)")
+    p.add_argument("--keep-parcels", default="V2-V4,MT,ITC,STG/STSd",
+                   help="comma list of parcels the consensus may live in")
+    p.add_argument("--parcel-annot", default=DEFAULT_ANNOT)
+    p.add_argument("--min-vertices", type=int, default=25,
+                   help="drop surface-connected islands smaller than this")
+    p.add_argument("--merge-rings", type=int, default=3,
+                   help="fragments within this many mesh rings become one ROI (0 = off)")
+    p.add_argument("--min-piece-consensus", type=int, default=50,
+                   help="a pinched-off lobe of an ROI is trimmed when it holds fewer "
+                        "consensus vertices than this (visual de-noising of the outline)")
+    p.add_argument("--names", help="comma list of cluster names posterior->anterior per "
+                                   "hemisphere (default: standard face-patch names by count); "
+                                   "a SINGLE name labels every cluster with it")
+    p.add_argument("--lenient", type=float,
+                   help="also admit clusters ANTERIOR to all strict ROIs at this lower "
+                        "threshold (an anterior-temporal patch in susceptibility dropout "
+                        "rarely survives the strict consensus); they are flagged in the json")
+    p.add_argument("--lenient-anterior-margin", type=float, default=2.0,
+                   help="a lenient cluster's centroid must be this many mm anterior to the "
+                        "most anterior strict ROI")
+    p.add_argument("--dominate", action="append", metavar="XFM:VOLUME",
+                   help="consensus vertices must additionally BEAT each of these same-session "
+                        "maps by --dominate-margin (e.g. an object ROI that must beat the "
+                        "face and animal contrasts)")
+    p.add_argument("--dominate-margin", type=float, default=2.0,
+                   help="sig-units margin for --dominate (2 = a 100x p-value gap)")
+    p.add_argument("--exclude-mask", action="append", metavar="NPY",
+                   help="vertex masks (.npy) the final ROIs may NOT enter (hard mutual "
+                        "exclusivity with existing ROIs; also keeps the closing step from "
+                        "growing back into them)")
+    p.add_argument("--annot-name", default="facepatches")
+    p.add_argument("--layer", default="facepatches", help="overlays.svg layer to draw")
+    p.add_argument("--mask-out", required=True, help=".npy for the FINAL vertex mask")
+    p.add_argument("--out", help="final PNG: ROI outlines on curvature (publication style)")
+    p.add_argument("--fill", action=argparse.BooleanOptionalAction, default=False,
+                   help="also fill the circled regions in the PNG (default: outlines only)")
+    p.add_argument("--roi-labels", action=argparse.BooleanOptionalAction, default=False,
+                   help="draw the ROI names in the PNG and the svg layer (default: off; the "
+                        "names stay in the annot and the json either way)")
+    p.add_argument("--font-size", type=float, default=18.0)
+    p.add_argument("--svg-smooth", type=int, default=2,
+                   help="Chaikin iterations for the drawn outlines (cosmetic only)")
+    p.set_defaults(func=cmd_roi_consensus)
+
+    p = sp.add_parser("roi-separate",
+                      help="make two ROI groups mutually exclusive by symmetric dominance arbitration, "
+                           "keeping every ROI a closed connected patch")
+    _roi_common(p)
+    p.add_argument("--group-a", action="append", required=True, metavar="NAME:LAYER:MASK:XFM:VOL",
+                   help="the categories that keep contested vertices by default; may overlap each other")
+    p.add_argument("--group-b", required=True, metavar="NAME:LAYER:MASK:XFM:VOL",
+                   help="the category that must become disjoint from group A")
+    p.add_argument("--margin", type=float, default=2.0,
+                   help="a side keeps a contested vertex when its sig beats the other side's by this "
+                        "(sig units, i.e. -log10 p); ambiguous vertices are dropped from both seeds")
+    p.add_argument("--mion", action=argparse.BooleanOptionalAction, default=True,
+                   help="flip sign before comparing (MION; default on, --no-mion for BOLD)")
+    p.add_argument("--min-vertices", type=int, default=25)
+    p.add_argument("--merge-rings", type=int, default=3)
+    p.add_argument("--merge-rings-b", type=int,
+                   help="larger grouping/closing radius for group B only: the arbitration "
+                        "tends to fragment B, and a bigger radius re-combines pieces that "
+                        "are separated by UNLABELED cortex (pieces separated by group A's "
+                        "territory stay apart - that is the disjointness)")
+    p.add_argument("--min-piece", type=int,
+                   help="drop region pieces smaller than this many vertices (default: "
+                        "--min-vertices); use a larger value to clean up regions the "
+                        "forbidden territory shattered")
+    p.add_argument("--boundary-smooth", type=int, default=0,
+                   help="majority-smoothing iterations on the final mask boundaries "
+                        "(moves a few vertices in/out; 2 recommended)")
+    p.add_argument("--min-flat-piece", type=int, default=0,
+                   help="drop FLAT-surface islands smaller than this (pieces separated from "
+                        "their patch by an anatomical cut can never be drawn contiguous)")
+    p.add_argument("--svg-smooth", type=int, default=2,
+                   help="Chaikin iterations for the drawn outlines (cosmetic only)")
+    p.set_defaults(func=cmd_roi_separate)
+
+    p = sp.add_parser("roi-tile",
+                      help="winner-take-all tiling of same-session maps into mutually exclusive labels "
+                           "(threshold + margin over the runner-up; no closing)")
+    _roi_common(p)
+    p.add_argument("--map", action="append", required=True, metavar="NAME:XFM:VOLUME",
+                   help="category name + pycortex transform + volume on the canonical grid; "
+                        "all from the same session so sig values are comparable")
+    p.add_argument("--thresh", type=float, default=4.0, help="the winner must reach this")
+    p.add_argument("--margin", type=float, default=2.0,
+                   help="the winner must beat the runner-up by this much, else the vertex "
+                        "stays unlabeled (sig units, i.e. -log10 p: 2 = a 100x p-value gap)")
+    p.add_argument("--mion", action=argparse.BooleanOptionalAction, default=True,
+                   help="flip sign before thresholding (MION; default on, --no-mion for BOLD)")
+    p.add_argument("--keep-parcels", default="V2-V4,MT,ITC,STG/STSd")
+    p.add_argument("--parcel-annot", default=DEFAULT_ANNOT)
+    p.add_argument("--min-vertices", type=int, default=25,
+                   help="drop islands smaller than this per category")
+    p.add_argument("--merge-rings", type=int, default=3,
+                   help="fragments within 2x this many rings count as one island")
+    p.add_argument("--annot-name", default="tiling")
+    p.add_argument("--layer", default="tiling", help="overlays.svg layer for the outlines")
+    p.add_argument("--svg-smooth", type=int, default=0,
+                   help="Chaikin iterations for the drawn outlines (cosmetic only)")
+    p.add_argument("--labels-out", required=True, help=".npy int vertex labels (0 = none)")
+    p.add_argument("--out", help="filled categorical flatmap PNG")
+    p.set_defaults(func=cmd_roi_tile)
+
+    p = sp.add_parser("roi-render",
+                      help="render one or several overlays.svg ROI layers as colored outlines on "
+                           "curvature, with a legend")
+    _roi_common(p)
+    p.add_argument("--layer", action="append", required=True,
+                   metavar="NAME[:COLOR[:LABEL[:WIDTH[:STYLE]]]]",
+                   help="WIDTH overrides --linewidth for that layer; STYLE 'dashed' draws "
+                        "the outline dashed (for an ROI whose quality is in question; needs "
+                        "label/<hemi>.<NAME>.annot in the FreeSurfer subject)")
+    p.add_argument("--linewidth", type=float, default=4.0)
+    p.add_argument("--parcels", action=argparse.BooleanOptionalAction, default=False,
+                   help="also draw the default parcellation layer ('rois') with its labels "
+                        "under the colored ROI outlines")
+    p.add_argument("--title", default="")
+    p.add_argument("--out", required=True)
+    p.set_defaults(func=cmd_roi_render)
 
     p = sp.add_parser("qc", help="metrics and figures of existing flat patches")
     _add_common(p)
