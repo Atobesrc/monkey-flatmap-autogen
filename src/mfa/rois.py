@@ -372,7 +372,7 @@ def consensus(a) -> None:
         off += n
     for hi in (0, 1):
         ds = [c for c in clusters if c["hemi"] == ("lh", "rh")[hi]]
-        for c, (nm, region) in zip(ds, per_hemi[hi]):
+        for c, (_nm, region) in zip(ds, per_hemi[hi]):
             c["vertices"] = int(region.sum())
     union = ["unknown"]
     for rois in per_hemi:
@@ -447,7 +447,7 @@ def _rebuild(sd: str, cx: str, subjects_dir: str, fs_subject: str, nverts: list[
         mesh = Mesh(sd, h)
         regs = circled_regions(mesh, mask[off:off + nverts[hi]], merge_rings, min_vertices,
                                forbidden=forbidden[off:off + nverts[hi]])
-        for region, n_orig, c in regs:
+        for region, _n_orig, _c in regs:
             lab = mesh.components(region)
             ids, cnts = np.unique(lab[region], return_counts=True)
             keep = (ids[cnts >= min_piece] if (cnts >= min_piece).any()

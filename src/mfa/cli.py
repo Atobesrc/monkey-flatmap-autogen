@@ -441,7 +441,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--skip", nargs="*", default=["unknown", "Unknown", "???"], help="label names to skip")
     p.add_argument("--min-faces", type=int, default=40, help="drop parcel islands smaller than this (faces)")
     p.add_argument("--font-size", default="11pt")
-    p.add_argument("--smooth", type=int, default=0, help="Chaikin smoothing iterations for the outlines (2 = smooth curves)")
+    p.add_argument("--smooth", type=int, default=0,
+                   help="Chaikin smoothing iterations for the outlines (2 = smooth curves)")
     p.add_argument("--min-label-depth", type=float, default=14.0,
                    help="skip the label of a piece thinner than this (px from border to its deepest point)")
     p.add_argument("--min-label-share", type=float, default=0.10,
